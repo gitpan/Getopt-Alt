@@ -10,21 +10,20 @@ use Moose;
 use warnings;
 use version;
 use Carp;
-use Scalar::Util;
-use List::Util;
-#use List::MoreUtils;
 use Data::Dumper qw/Dumper/;
 use English qw/ -no_match_vars /;
 use base qw/Exporter/;
-use Getopt::Alt::Option;
+use Getopt::Alt::Option qw/build_option/;
+use Getopt::Alt::Exception;
 use Pod::Usage;
+use TryCatch;
 
 use overload (
     '@{}'  => \&get_files,
-    #'bool' => sub { 1 },
+    'bool' => sub { 1 },
 );
 
-our $VERSION     = version->new('0.0.1');
+our $VERSION     = version->new('0.0.2');
 our @EXPORT_OK   = qw/get_options/;
 our %EXPORT_TAGS = ();
 our $EXIT        = 1;
@@ -32,7 +31,7 @@ our $EXIT        = 1;
 
 has options => (
     is    => 'rw',
-    isa   => 'ArrayRef[Getopt::Alt::Option]',
+    isa   => 'Getopt::Alt::Dynamic',
 );
 has opt => (
     is      => 'rw',
@@ -74,6 +73,7 @@ has cmds => (
     default => sub { [] },
 );
 
+my $count = 1;
 around BUILDARGS => sub {
     my ($orig, $class, @params) = @_;
     my %param;
@@ -82,7 +82,6 @@ around BUILDARGS => sub {
         %param  = %{ $params[0] };
         @params = @{ $params[1] };
     }
-    $param{options} ||= [];
 
     if ( !exists $param{helper} || $param{helper} ) {
         push @params, (
@@ -93,17 +92,23 @@ around BUILDARGS => sub {
         delete $param{helper};
     }
 
-    while ( my $option = shift @params ) {
-        push @{ $param{options} }, Getopt::Alt::Option->new($option);
+    if ( @params ) {
+        my $class_name = 'Getopt::Alt::Dynamic::A' . $count++;
+        my $object = Moose::Meta::Class->create(
+            $class_name,
+            superclasses => [ 'Getopt::Alt::Dynamic' ],
+            #methods      => \%method,
+        );
+
+        while ( my $option = shift @params ) {
+            build_option($object, $option);
+        }
+
+        $param{options} = $class_name->new;
     }
 
     return $class->$orig(%param);
 };
-
-sub BUILD {
-    my ($self) = @_;
-
-}
 
 sub get_options {
     my $caller = caller;
@@ -113,13 +118,27 @@ sub get_options {
         @_ = ( { default => $options}, [ @_ ] );
     }
 
-    my $self = __PACKAGE__->new(@_);
+    try {
+        my $self = __PACKAGE__->new(@_);
 
-    $self->help($caller) if !$self->help || $self->help eq __PACKAGE__;
+        $self->help($caller) if !$self->help || $self->help eq __PACKAGE__;
 
-    $self->process();
+        $self->process();
 
-    return $self;
+        return $self;
+    }
+    catch ($e) {
+        if ( ref $e && ref $e eq 'Getopt::Alt::Exception' && $e->help ) {
+            die $e;
+        }
+
+        warn $e;
+        my $self = __PACKAGE__->new();
+
+        $self->help($caller) if !$self->help || $self->help eq __PACKAGE__;
+
+        $self->_show_help(1);
+    }
 }
 
 sub process {
@@ -167,7 +186,7 @@ sub process {
         if ( $self->opt->{VERSION} ) {
              my ($name)  = $PROGRAM_NAME =~ m{^.*/(.*?)$}mxs;
              my $version = defined $main::VERSION ? $main::VERSION : 'undef';
-             die "$name Version = $version\n";
+             die Getopt::Alt::Exception->new( message => "$name Version = $version\n", help => 1);
         }
         elsif ( $self->opt->{man} ) {
             $self->_show_help(2);
@@ -187,7 +206,11 @@ sub best_option {
         $long =~ s/^no-//xms;
     }
 
-    for my $opt (@{ $self->options }) {
+    my $meta = $self->options->meta;
+
+    for my $name ( $meta->get_attribute_list ) {
+        my $opt = $meta->get_attribute($name);
+
         return $opt if $long && $opt->name eq $long;
 
         for my $name (@{ $opt->names }) {
@@ -224,7 +247,7 @@ sub _show_help {
     );
     my $message = $ScalarHandle::out;
     close OUT;
-    die $message;
+    die Getopt::Alt::Exception->new( message => $message, help => 1 );
 }
 
 1;
@@ -257,7 +280,7 @@ Getopt::Alt - Alternate method of processing command line arguments
 
 =head1 VERSION
 
-This documentation refers to Getopt::Alt version 0.1.
+This documentation refers to Getopt::Alt version 0.0.2.
 
 =head1 SYNOPSIS
 
