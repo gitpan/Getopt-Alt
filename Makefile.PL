@@ -8,8 +8,10 @@ WriteMakefile
   'PREREQ_PM' => {
                    'Config::Any' => 0,
                    'Moose' => 0,
+                   'Moose::Role' => 0,
                    'Test::More' => 0,
                    'Test::NoWarnings' => 0,
+                   'TryCatch' => 0,
                    'parent' => 0,
                    'version' => 0
                  },
