@@ -22,7 +22,7 @@ Moose::Exporter->setup_import_methods(
 );
 
 
-our $VERSION = version->new('0.0.3');
+our $VERSION = version->new('0.1.0');
 
 Moose::Util::meta_attribute_alias('Getopt::Alt::Option');
 
@@ -88,7 +88,6 @@ my $r_spec     = qr/^ ( $r_names ) ( $r_inc | $r_neg | $r_type_ref )? ( $r_null 
 # calling new => ->new( 'test|t' )
 #                ->new( name => 'text', names => [qw/test tes te t/], ... )
 #                ->new({ name => 'text', names => [qw/test tes te t/], ... )
-#around BUILDARGS => sub {
 sub build_option {
     my ($class, @params) = @_;
 
@@ -169,6 +168,10 @@ sub build_option {
         : $params{ref}                  ? $params{ref}
         :                                 'Str';
 
+    if ( $params{nullable} ) {
+        $type = "Maybe[$type]";
+    }
+
     $class->add_attribute(
         $params{name},
         is   => 'rw',
@@ -177,7 +180,7 @@ sub build_option {
     );
 
     return $class->get_attribute( $params{name} );
-};
+}
 
 sub process {
     my ($self, $long, $short, $data, $args) = @_;
@@ -254,7 +257,7 @@ Getopt::Alt::Option - Sets up a particular command line option
 
 =head1 VERSION
 
-This documentation refers to Getopt::Alt::Option version 0.0.3.
+This documentation refers to Getopt::Alt::Option version 0.1.0.
 
 
 =head1 SYNOPSIS

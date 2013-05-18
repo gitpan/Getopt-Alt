@@ -4,7 +4,7 @@
       "Ivan Wills <ivan.wills@gmail.com>"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "Module::Build version 0.4001, CPAN::Meta::Converter version 2.110440",
+   "generated_by" : "Module::Build version 0.4001, CPAN::Meta::Converter version 2.112621",
    "license" : [
       "perl_5"
    ],
@@ -46,23 +46,23 @@
    "provides" : {
       "Getopt::Alt" : {
          "file" : "lib/Getopt/Alt.pm",
-         "version" : "v0.0.3"
+         "version" : "v0.1.0"
       },
       "Getopt::Alt::Command" : {
          "file" : "lib/Getopt/Alt/Command.pm",
-         "version" : "v0.0.3"
+         "version" : "v0.1.0"
       },
       "Getopt::Alt::Dynamic" : {
          "file" : "lib/Getopt/Alt/Dynamic.pm",
-         "version" : "v0.0.3"
+         "version" : "v0.1.0"
       },
       "Getopt::Alt::Exception" : {
          "file" : "lib/Getopt/Alt/Exception.pm",
-         "version" : "v0.0.3"
+         "version" : "v0.1.0"
       },
       "Getopt::Alt::Option" : {
          "file" : "lib/Getopt/Alt/Option.pm",
-         "version" : "v0.0.3"
+         "version" : "v0.1.0"
       },
       "ScalarHandle" : {
          "file" : "lib/Getopt/Alt.pm",
@@ -78,9 +78,8 @@
          "http://dev.perl.org/licenses/"
       ],
       "repository" : {
-         "type" : "git",
          "url" : "git://github.com/ivanwills/Getopt-Alt.git"
       }
    },
-   "version" : "v0.0.3"
+   "version" : "v0.1.0"
 }
