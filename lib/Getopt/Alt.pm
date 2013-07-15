@@ -10,7 +10,7 @@ use Moose;
 use warnings;
 use version;
 use Carp;
-use Data::Dumper qw/Dumper/;
+use Data::Dumper;
 use English qw/ -no_match_vars /;
 use base qw/Exporter/;
 use Getopt::Alt::Option qw/build_option/;
@@ -23,7 +23,7 @@ use overload (
     'bool' => sub { 1 },
 );
 
-our $VERSION     = version->new('0.1.0');
+our $VERSION     = version->new('0.1.1');
 our @EXPORT_OK   = qw/get_options/;
 our %EXPORT_TAGS = ();
 our $EXIT        = 1;
@@ -37,6 +37,7 @@ has options => (
 has opt => (
     is      => 'rw',
     isa     => 'Getopt::Alt::Dynamic',
+    clearer => 'clear_opt',
 );
 has default => (
     is      => 'rw',
@@ -47,11 +48,6 @@ has files => (
     is      => 'rw',
     isa     => 'ArrayRef[Str]',
     default => sub {[]},
-);
-has argv => (
-    is        => 'rw',
-    isa       => 'ArrayRef[Str]',
-    predicate => 'has_argv',
 );
 has bundle => (
     is      => 'rw',
@@ -75,6 +71,7 @@ has cmds => (
 has cmd => (
     is      => 'rw',
     isa     => 'Str',
+    clearer => 'clear_cmd',
 );
 has sub_command => (
     is            => 'rw',
@@ -86,12 +83,17 @@ has sub_command => (
                    'assumed to be parameters to passed to get_options ' .
                    'where the generated options will be a sub object of ' .
                    'generated options object. Finally if this is a sub ' .
-                   'ref it will be called with self and the rest of argv',
+                   'ref it will be called with self and the rest of ARGV',
 );
 has default_sub_command => (
     is        => 'rw',
     isa       => 'Str',
     predicate => 'has_default_sub_command',
+);
+has auto_complete => (
+    is        => 'rw',
+    isa       => 'CodeRef',
+    predicate => 'has_auto_complete',
 );
 
 my $count = 1;
@@ -109,6 +111,7 @@ around BUILDARGS => sub {
             'help',
             'man',
             'VERSION',
+            'auto_complete|auto-complete=i',
         );
         delete $param{helper};
     }
@@ -146,7 +149,7 @@ sub get_options {
 
         $self->process();
 
-        return $self;
+        return wantarray ? ( $self->opt, $self->cmd, $self ) : $self->opt;
     }
     catch ($e) {
         if ( ref $e && ref $e eq 'Getopt::Alt::Exception' && $e->help ) {
@@ -164,9 +167,12 @@ sub get_options {
 
 sub process {
     my ($self, @args) = @_;
-    if ( !@args ) {
-        @args = $self->has_argv ? @{ $self->argv } : @ARGV;
-    }
+    my $passed_args = scalar @args;
+    @args = $passed_args ? @args : @ARGV;
+    $self->clear_opt;
+    $self->clear_cmd;
+    $self->files([]);
+
     my $class = $self->options;
     $self->opt( $class->new( %{ $self->default } ) );
 
@@ -200,12 +206,12 @@ sub process {
     }
 
     $self->cmd( shift @{ $self->files } ) if @{ $self->files } && $self->sub_command;
-    if ( !$self->has_argv && $self->files ) {
+    if ( !$passed_args && $self->files ) {
         @ARGV = ( @{ $self->files }, @args );
     }
 
     if ( ref $self->sub_command eq 'HASH' ) {
-        my $sub = $self->sub_command->{$self->cmd};
+        my $sub = [ @{$self->sub_command->{$self->cmd}} ];
         if (!$sub) {
             warn "Unknown command '$self->cmd'!\n";
             die Getopt::Alt::Exception->new( message => "Unknown command '$self->cmd'" )
@@ -214,16 +220,23 @@ sub process {
         }
 
         if ( ref $sub eq 'ARRAY' ) {
+            # check the style
+            my $options  = @$sub == 2 && ref $sub->[0] eq 'HASH' && ref $sub->[1] eq 'ARRAY' ? shift @$sub : {};
+            my $opt_args = %$options ? $sub->[0] : $sub;
+
             # build sub command object
             my $sub_obj = Getopt::Alt->new(
                 {
+                    %{ $options },
                     options => $self->options, # inherit this objects options
-                    default => {%{ $self->opt }},
+                    default => { %{ $self->opt }, %{ $options->{default} || {} } },
                 },
-                $sub
+                $opt_args
             );
-            $sub_obj->process($self->files);
+            local @ARGV;
+            $sub_obj->process(@args);
             $self->opt( $sub_obj->opt );
+            $self->files( $sub_obj->files );
         }
     }
 
@@ -283,12 +296,23 @@ sub get_files {
 sub _show_help {
     my ($self, $verbosity, $msg) = @_;
 
+    my %input;
+    if ( $self->help && $self->help ne 1 ) {
+        my $help = $self->help;
+        if ( !-f $help ) {
+            $help  .= '.pm';
+            $help =~ s{::}{/}g;
+        }
+        %input = ( -input => $INC{$help} );
+    }
+
     tie *OUT, 'ScalarHandle';
     pod2usage(
         $msg ? ( -msg => $msg ) : (),
         -verbose => $verbosity,
         -exitval => 'NOEXIT',
         -output  => \*OUT,
+        %input,
     );
     my $message = $ScalarHandle::out;
     close OUT;
@@ -325,7 +349,7 @@ Getopt::Alt - Alternate method of processing command line arguments
 
 =head1 VERSION
 
-This documentation refers to Getopt::Alt version 0.1.0.
+This documentation refers to Getopt::Alt version 0.1.1.
 
 =head1 SYNOPSIS
 
@@ -493,12 +517,9 @@ with the values in here each time process is called
 
 =item C<files> - ArrayRef[Str]
 
-Any arguments that not consumed as part of options (usually files), if C<argv>
-was not specified then this value would be put back into C<@ARGV>.
-
-=item C<argv> - ArrayRef[Str]
-
-The arguments that you wish to process, this defaults to C<@ARGV>.
+Any arguments that not consumed as part of options (usually files), if no
+arguments were passed to C<process> then this value would also be put back
+into C<@ARGV>.
 
 =item C<bundle> - bool
 
@@ -530,7 +551,8 @@ The individual command option specifications processed.
 
 =item C<opt> - HashRef
 
-The values processed from the argv.
+The values processed from the C<$ARGV> or arguments passed to the C<process>
+method..
 
 =item C<default> - HashRef
 
