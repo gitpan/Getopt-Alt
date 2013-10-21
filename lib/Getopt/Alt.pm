@@ -12,7 +12,7 @@ use version;
 use Carp;
 use Data::Dumper;
 use English qw/ -no_match_vars /;
-use base qw/Exporter/;
+use List::MoreUtils qw/uniq/;
 use Getopt::Alt::Option qw/build_option/;
 use Getopt::Alt::Exception;
 use Pod::Usage;
@@ -23,11 +23,12 @@ use overload (
     'bool' => sub { 1 },
 );
 
-our $VERSION     = version->new('0.1.1');
-our @EXPORT_OK   = qw/get_options/;
-our %EXPORT_TAGS = ();
-our $EXIT        = 1;
-#our @EXPORT      = qw//;
+Moose::Exporter->setup_import_methods(
+    as_is => [qw/get_options/],
+);
+
+our $VERSION = version->new('0.1.2');
+our $EXIT    = 1;
 
 has options => (
     is      => 'rw',
@@ -62,6 +63,10 @@ has ignore_case => (
 has help => (
     is      => 'rw',
     isa     => 'Str',
+);
+has helper => (
+    is      => 'rw',
+    isa     => 'Bool',
 );
 has cmds => (
     is      => 'rw',
@@ -107,13 +112,13 @@ around BUILDARGS => sub {
     }
 
     if ( !exists $param{helper} || $param{helper} ) {
-        push @params, (
+        unshift @params, (
             'help',
             'man',
             'VERSION',
-            'auto_complete|auto-complete=i',
+            'auto_complete|auto-complete',
+            'auto_complete_list|auto-complete-list!',
         );
-        delete $param{helper};
     }
 
     if ( @params ) {
@@ -175,33 +180,55 @@ sub process {
 
     my $class = $self->options;
     $self->opt( $class->new( %{ $self->default } ) );
+    my @errors;
 
     ARG:
     while (my $arg = shift @args) {
-        my ($long, $short, $data);
-        if ( $arg =~ /^-- (\w[^=\s]+) (?:= (.*) )?/xms ) {
-            $long = $1;
-            $data = $2;
-        }
-        elsif ( $arg =~ /^- (\w) =? (.*)/xms ) {
-            $short = $1;
-            $data  = $2;
-        }
-        else {
-            push @{ $self->files }, $arg;
-            last ARG if $self->sub_command;
-            next ARG;
-        }
+        try {
+                my ($long, $short, $data);
+                if ( $arg =~ /^-- (\w[^=\s]+) (?:= (.*) )?/xms ) {
+                    $long = $1;
+                    $data = $2;
+                }
+                elsif ( $arg =~ /^- (\w) =? (.*)/xms ) {
+                    $short = $1;
+                    $data  = $2;
+                }
+                else {
+                    push @{ $self->files }, $arg;
+                    die $self->sub_command ? "last\n" : "next\n";
+                }
 
-        my $opt = $self->best_option( $long, $short );
-        $opt->value( $self->opt->{ $opt->name } );
+                my $opt = $self->best_option( $long, $short );
+                $opt->value( $self->opt->{ $opt->name } );
 
-        my ($value, $used) = $opt->process( $long, $short, $data, \@args );
-        my $opt_name = $opt->name;
-        $self->opt->{$opt->name} = $value;
+                my ($value, $used) = $opt->process( $long, $short, $data, \@args );
+                my $opt_name = $opt->name;
+                if ( $self->opt->auto_complete && $opt_name eq 'auto_complete_list' ) {
+                    print join ' ', $self->list_options;
+                    exit 0;
+                }
+                $self->opt->{$opt->name} = $value;
 
-        if ( !$used && $short && defined $data && length $data ) {
-            unshift @args, '-' . $data;
+                if ( !$used && $short && defined $data && length $data ) {
+                    unshift @args, '-' . $data;
+                }
+        }
+        catch ($e where { my $a = $_; $_ eq "next\n" } ) {
+            next;
+        }
+        catch ($e where { my $a = $_; $_ eq "last\n" } ) {
+            last;
+        }
+        catch ($e) {
+            $e = $e->[0] if ref $e eq 'ARRAY' && @$e == 1;
+
+            if ( $self->auto_complete && $self->opt->auto_complete ) {
+                push @errors, $e;
+            }
+            else {
+                die $e;
+            }
         }
     }
 
@@ -252,9 +279,43 @@ sub process {
         elsif ( $self->opt->{help} ) {
             $self->_show_help(1);
         }
+        elsif ( $self->auto_complete && $self->opt->auto_complete ) {
+            if ( $ARGV[-1] =~ /^-/ ) {
+                print join ' ', $self->list_options;
+            }
+            else {
+                # run the auto complete method
+                $self->auto_complete->($self, $self->opt->auto_complete, \@errors);
+            }
+
+            # exit here as auto complete should stop processing
+            exit 0;
+        }
     }
 
     return $self;
+}
+
+sub list_options {
+    my ($self) = @_;
+    my @names;
+
+    my $meta = $self->options->meta;
+
+    for my $name ( $meta->get_attribute_list ) {
+        my $opt = $meta->get_attribute($name);
+        for my $name (@{ $opt->names }) {
+
+            # skip auto-complete commands (they are hidden options)
+            next if grep {$name eq $_} qw/auto_complete auto-complete auto_complete_list auto-complete-list/;
+            push @names, $name
+        }
+    }
+
+    return map {
+            length $_ == 1 ? "-$_" : "--$_"
+        }
+        uniq sort { lc $a cmp lc $b } @names;
 }
 
 sub best_option {
@@ -280,10 +341,17 @@ sub best_option {
     return $self->best_option($long, $short, 1) if !$no;
 
     if ( $self->help ) {
-        $self->_show_help(1, "Unknown option '" . ($long ? "--$long" : "-$short") . "'")
+        die [ Getopt::Alt::Exception->new(
+                message => "Unknown option '" . ($long ? "--$long" : "-$short") . "'\n",
+                option  => ($long ? "--$long" : "-$short"),
+            ) ]
     }
     else {
-        confess "Unknown option '" . ($long ? "--$long" : "-$short") . "'\n";
+        die [ Getopt::Alt::Exception->new(
+                help    => 1,
+                message => "Unknown option '" . ($long ? "--$long" : "-$short") . "'\n",
+                option  => ($long ? "--$long" : "-$short"),
+            ) ]
     }
 }
 
@@ -349,7 +417,7 @@ Getopt::Alt - Alternate method of processing command line arguments
 
 =head1 VERSION
 
-This documentation refers to Getopt::Alt version 0.1.1.
+This documentation refers to Getopt::Alt version 0.1.2.
 
 =head1 SYNOPSIS
 
@@ -434,6 +502,22 @@ This documentation refers to Getopt::Alt version 0.1.1.
    );
    print Dumper $option->opt;  # command with sub command options merged in
 
+   # auto_complete
+   my $options = get_options(
+       {
+           helper        => 1, # default when using get_options
+           auto_complete => sub {
+               my ($opt, $auto) = @_;
+               # ... code for auto completeion
+               # called if --auto-complete specified on the command line
+           },
+       },
+       [
+           'string|s=s',
+           'int|i=i',
+       ],
+   );
+
 =head1 DESCRIPTION
 
 The aim of C<Getopt::Alt> is to provide an alternative to L<Getopt::Long> that
@@ -500,7 +584,7 @@ This is the equivalent of calling new(...)->process but it does some extra
 argument processing.
 
 B<Note>: The second form is the same basically the same as Getopt::Long's
-getOptions called with a hash ref as the first parameter.
+GetOptions called with a hash ref as the first parameter.
 
 =head2 Class Methods
 
@@ -572,6 +656,10 @@ Description:
 internal method
 
 =head3 C<process ()>
+
+=head3 C<list_options ()>
+
+Returns a list of all command line options in the current object.
 
 =head3 C<best_option ()>
 

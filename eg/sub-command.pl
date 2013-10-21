@@ -1,48 +1,78 @@
-package Getopt::Alt::Dynamic;
+#!/usr/bin/perl
 
-# Created on: 2013-05-07 19:53:24
+# Created on: 2013-07-12 06:49:47
 # Create by:  Ivan Wills
 # $Id$
 # $Revision$, $HeadURL$, $Date$
 # $Revision$, $Source$, $Date$
 
-use Moose;
+use strict;
+use warnings;
 use version;
-use Carp;
-use Scalar::Util;
-use List::Util;
-#use List::MoreUtils;
-use Data::Dumper qw/Dumper/;
+use Getopt::Alt;
 use English qw/ -no_match_vars /;
 
+our $VERSION = version->new('0.0.1');
+my ($name)   = $PROGRAM_NAME =~ m{^.*/(.*?)$}mxs;
 
-our $VERSION     = version->new('0.1.2');
-our @EXPORT_OK   = qw//;
-our %EXPORT_TAGS = ();
-#our @EXPORT      = qw//;
+main();
+exit 0;
+
+sub main {
+
+    my $options = Getopt::Alt->new(
+        {
+            bundle      => 1,
+            help        => 1,
+            ignore_case => 0,
+            sub_command => {
+                show => [
+                    'lots|l',
+                ],
+                details => [
+                    default => {
+                        verbose => 1,
+                        type    => 'known',
+                    },
+                    [
+                        'type|t=s',
+                    ],
+                ]
+            },
+        },
+        [
+            'general|g!',
+        ],
+    )->process;
+
+    # do stuff here
 
 
+    return;
+}
 
-1;
-
-__END__
+__DATA__
 
 =head1 NAME
 
-Getopt::Alt::Dynamic - <One-line description of module's purpose>
+sub-command - <One-line description of commands purpose>
 
 =head1 VERSION
 
-This documentation refers to Getopt::Alt::Dynamic version 0.1.2.
-
+This documentation refers to sub-command version 0.0.1
 
 =head1 SYNOPSIS
 
-   use Getopt::Alt::Dynamic;
+   sub-command [option]
 
-   # Brief but working code example(s) here showing the most common usage(s)
-   # This section will be as far as many users bother reading, so make it as
-   # educational and exemplary as possible.
+ OPTIONS:
+  -o --other         other option
+
+  -v --verbose       Show more detailed option
+     --version       Prints the version information
+     --help          Prints this help information
+     --man           Prints the full documentation for sub-command
+
 
 
 =head1 DESCRIPTION
@@ -65,9 +95,6 @@ Name the section accordingly.
 In an object-oriented module, this section should begin with a sentence (of the
 form "An object of this class represents ...") to give the reader a high-level
 context to help them understand the methods that are subsequently described.
-
-
-
 
 =head1 DIAGNOSTICS
 
@@ -117,7 +144,6 @@ Patches are welcome.
 =head1 AUTHOR
 
 Ivan Wills - (ivan.wills@gmail.com)
-<Author name(s)>  (<contact address>)
 
 =head1 LICENSE AND COPYRIGHT
 

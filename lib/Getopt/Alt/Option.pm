@@ -15,6 +15,7 @@ use Scalar::Util;
 use List::Util;
 use Data::Dumper qw/Dumper/;
 use English qw/ -no_match_vars /;
+use Getopt::Alt::Exception;
 
 Moose::Exporter->setup_import_methods(
     as_is     => [qw/build_option/],
@@ -22,7 +23,7 @@ Moose::Exporter->setup_import_methods(
 );
 
 
-our $VERSION = version->new('0.1.1');
+our $VERSION = version->new('0.1.2');
 
 Moose::Util::meta_attribute_alias('Getopt::Alt::Option');
 
@@ -191,7 +192,11 @@ sub process {
     if ($self->type) {
         $used = 1;
         if ( !defined $data || length $data == 0 ) {
-            confess "No " . $self->type . " passed for $name\n"
+            die [ Getopt::Alt::Exception->new(
+                    message => "The option '$name' requires an " . $self->type . " argument\n",
+                    option  => $name,
+                    type    => $self->type
+                ) ]
                 if ( ! defined $args->[0]  && !$self->nullable ) || (
                     $args->[0] && $args->[0] =~ /^-/ && !( $self->type eq 'Int' || $self->type eq 'Num' )
                 );
@@ -257,7 +262,7 @@ Getopt::Alt::Option - Sets up a particular command line option
 
 =head1 VERSION
 
-This documentation refers to Getopt::Alt::Option version 0.1.1.
+This documentation refers to Getopt::Alt::Option version 0.1.2.
 
 
 =head1 SYNOPSIS
