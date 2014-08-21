@@ -16,7 +16,9 @@ use List::MoreUtils qw/uniq/;
 use Getopt::Alt::Option qw/build_option/;
 use Getopt::Alt::Exception;
 use Pod::Usage;
-use TryCatch;
+use Try::Tiny;
+use Path::Class;
+use Config::Any;
 
 use overload (
     '@{}'  => \&get_files,
@@ -27,7 +29,7 @@ Moose::Exporter->setup_import_methods(
     as_is => [qw/get_options/],
 );
 
-our $VERSION = version->new('0.1.2');
+our $VERSION = version->new('0.1.3');
 our $EXIT    = 1;
 
 has options => (
@@ -100,6 +102,11 @@ has auto_complete => (
     isa       => 'CodeRef',
     predicate => 'has_auto_complete',
 );
+has name => (
+    is      => 'rw',
+    isa     => 'Str',
+    default => sub { file($0)->basename },
+);
 
 my $count = 1;
 around BUILDARGS => sub {
@@ -139,35 +146,59 @@ around BUILDARGS => sub {
     return $class->$orig(%param);
 };
 
-sub get_options {
+sub BUILD {
+    my ($self) = @_;
+
+    my $basename = $self->name;
+    my $conf = Config::Any->load_stems({
+        stems   => [ ".$basename", "$ENV{HOME}/.$basename", "/etc/.$basename" ],
+        use_ext => 1,
+    });
+    $conf = {
+        map { %$_        }
+        map { values %$_ }
+        @{ $conf || [] }
+    };
+
+    # perlcritic is confused here combining hashes is not the same as comma seperated arguments
+    $self->default({ %{$self->default}, %$conf, });  ## no critic
+
+    return;
+}
+
+sub get_options {  ## no critic
+    my @args = @_;
     my $caller = caller;
 
-    if ( @_ > 2 && ref $_[0] eq 'HASH' && ref $_[1] ne 'ARRAY' ) {
-        my $options = shift @_;
-        @_ = ( { default => $options}, [ @_ ] );
+    if ( @args > 2 && ref $args[0] eq 'HASH' && ref $args[1] ne 'ARRAY' ) {
+        my $options = shift @args;
+        @args = ( { default => $options}, [ @args ] );
     }
 
+    my $self;
     try {
-        my $self = __PACKAGE__->new(@_);
+        $self = __PACKAGE__->new(@args);
 
         $self->help($caller) if !$self->help || $self->help eq __PACKAGE__;
 
         $self->process();
-
-        return wantarray ? ( $self->opt, $self->cmd, $self ) : $self->opt;
     }
-    catch ($e) {
-        if ( ref $e && ref $e eq 'Getopt::Alt::Exception' && $e->help ) {
-            die $e;
+    catch {
+        if ( ref $_ && ref $_ eq 'Getopt::Alt::Exception' && $_->help ) {
+            die $_;
         }
 
-        warn $e;
-        my $self = __PACKAGE__->new();
+        warn $_;
+        $self = __PACKAGE__->new();
 
         $self->help($caller) if !$self->help || $self->help eq __PACKAGE__;
 
         $self->_show_help(1);
-    }
+    };
+
+    return if !defined $self;
+
+    return wantarray ? ( $self->opt, $self->cmd, $self ) : $self->opt;
 }
 
 sub process {
@@ -184,6 +215,7 @@ sub process {
 
     ARG:
     while (my $arg = shift @args) {
+        my $action = '';
         try {
                 my ($long, $short, $data);
                 if ( $arg =~ /^-- (\w[^=\s]+) (?:= (.*) )?/xms ) {
@@ -214,22 +246,26 @@ sub process {
                     unshift @args, '-' . $data;
                 }
         }
-        catch ($e where { my $a = $_; $_ eq "next\n" } ) {
-            next;
-        }
-        catch ($e where { my $a = $_; $_ eq "last\n" } ) {
-            last;
-        }
-        catch ($e) {
-            $e = $e->[0] if ref $e eq 'ARRAY' && @$e == 1;
-
-            if ( $self->auto_complete && $self->opt->auto_complete ) {
-                push @errors, $e;
+        catch {
+            if ( $_ eq "next\n" ) {
+                $action = 'next';
+            }
+            elsif ( $_ eq "last\n" ) {
+                $action = 'last';
             }
             else {
-                die $e;
+                $_ = $_->[0] if ref $_ eq 'ARRAY' && @$_ == 1;
+
+                if ( $self->auto_complete && $self->opt->auto_complete ) {
+                    push @errors, $_;
+                }
+                else {
+                    die $_;
+                }
             }
-        }
+        };
+        next if $action eq 'next';
+        last if $action eq 'last';
     }
 
     $self->cmd( shift @{ $self->files } ) if @{ $self->files } && $self->sub_command;
@@ -374,38 +410,18 @@ sub _show_help {
         %input = ( -input => $INC{$help} );
     }
 
-    tie *OUT, 'ScalarHandle';
+    require Tie::Handle::Scalar;
+    my $out = '';
+    tie *FH, 'Tie::Handle::Scalar', \$out;
     pod2usage(
         $msg ? ( -msg => $msg ) : (),
         -verbose => $verbosity,
         -exitval => 'NOEXIT',
-        -output  => \*OUT,
+        -output  => \*FH,
         %input,
     );
-    my $message = $ScalarHandle::out;
-    close OUT;
-    die Getopt::Alt::Exception->new( message => $message, help => 1 );
+    die Getopt::Alt::Exception->new( message => $out, help => 1 );
 }
-
-1;
-
-package ScalarHandle;
-use strict;
-use warnings;
-use parent qw/Tie::Handle/;
-
-our $out = '';
-
-sub TIEHANDLE {
-    my ($class) = @_;
-    $out = '';
-    return bless {}, $class;
-}
-sub PRINT {
-    my ($self, @lines) = @_;
-    $out .= join '', @lines;
-}
-sub CLOSE { $out = '' }
 
 1;
 
@@ -417,7 +433,7 @@ Getopt::Alt - Alternate method of processing command line arguments
 
 =head1 VERSION
 
-This documentation refers to Getopt::Alt version 0.1.2.
+This documentation refers to Getopt::Alt version 0.1.3.
 
 =head1 SYNOPSIS
 

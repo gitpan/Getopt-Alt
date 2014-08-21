@@ -4,7 +4,7 @@
       "Ivan Wills <ivan.wills@gmail.com>"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "Module::Build version 0.4001, CPAN::Meta::Converter version 2.131560",
+   "generated_by" : "Module::Build version 0.4204",
    "license" : [
       "perl_5"
    ],
@@ -33,13 +33,15 @@
             "Test::Spelling" : "0"
          },
          "requires" : {
+            "Config::Any" : "0",
             "List::MoreUtils" : "0",
             "List::Util" : "0",
             "Moose" : "0",
             "Moose::Role" : "0",
             "Path::Class" : "0",
             "Scalar::Util" : "0",
-            "TryCatch" : "0",
+            "Tie::Handle::Scalar" : "0",
+            "Try::Tiny" : "0",
             "parent" : "0",
             "perl" : "5.006",
             "version" : "0"
@@ -49,26 +51,23 @@
    "provides" : {
       "Getopt::Alt" : {
          "file" : "lib/Getopt/Alt.pm",
-         "version" : "v0.1.2"
+         "version" : "v0.1.3"
       },
       "Getopt::Alt::Command" : {
          "file" : "lib/Getopt/Alt/Command.pm",
-         "version" : "v0.1.2"
+         "version" : "v0.1.3"
       },
       "Getopt::Alt::Dynamic" : {
          "file" : "lib/Getopt/Alt/Dynamic.pm",
-         "version" : "v0.1.2"
+         "version" : "v0.1.3"
       },
       "Getopt::Alt::Exception" : {
          "file" : "lib/Getopt/Alt/Exception.pm",
-         "version" : "v0.1.2"
+         "version" : "v0.1.3"
       },
       "Getopt::Alt::Option" : {
          "file" : "lib/Getopt/Alt/Option.pm",
-         "version" : "v0.1.2"
-      },
-      "ScalarHandle" : {
-         "file" : "lib/Getopt/Alt.pm"
+         "version" : "v0.1.3"
       }
    },
    "release_status" : "stable",
@@ -83,5 +82,5 @@
          "url" : "git://github.com/ivanwills/Getopt-Alt.git"
       }
    },
-   "version" : "v0.1.2"
+   "version" : "v0.1.3"
 }
