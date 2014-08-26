@@ -10,12 +10,10 @@ use Moose;
 use warnings;
 use version;
 use Carp;
-use Data::Dumper;
 use English qw/ -no_match_vars /;
 use List::MoreUtils qw/uniq/;
 use Getopt::Alt::Option qw/build_option/;
 use Getopt::Alt::Exception;
-use Pod::Usage;
 use Try::Tiny;
 use Path::Class;
 use Config::Any;
@@ -29,7 +27,7 @@ Moose::Exporter->setup_import_methods(
     as_is => [qw/get_options/],
 );
 
-our $VERSION = version->new('0.1.3');
+our $VERSION = version->new('0.1.4');
 our $EXIT    = 1;
 
 has options => (
@@ -413,7 +411,8 @@ sub _show_help {
     require Tie::Handle::Scalar;
     my $out = '';
     tie *FH, 'Tie::Handle::Scalar', \$out;
-    pod2usage(
+    require Pod::Usage;
+    Pod::Usage::pod2usage(
         $msg ? ( -msg => $msg ) : (),
         -verbose => $verbosity,
         -exitval => 'NOEXIT',
@@ -433,7 +432,7 @@ Getopt::Alt - Alternate method of processing command line arguments
 
 =head1 VERSION
 
-This documentation refers to Getopt::Alt version 0.1.3.
+This documentation refers to Getopt::Alt version 0.1.4.
 
 =head1 SYNOPSIS
 

@@ -9,17 +9,9 @@ package Getopt::Alt::Command;
 use Moose;
 use version;
 use Carp;
-use Scalar::Util;
-use List::Util;
-#use List::MoreUtils;
-use Data::Dumper qw/Dumper/;
 use English qw/ -no_match_vars /;
 
-
-our $VERSION     = version->new('0.1.3');
-our @EXPORT_OK   = qw//;
-our %EXPORT_TAGS = ();
-#our @EXPORT      = qw//;
+our $VERSION = version->new('0.1.4');
 
 has cmd => (
     is       => 'ro',
@@ -64,7 +56,7 @@ Getopt::Alt::Command - <One-line description of module's purpose>
 
 =head1 VERSION
 
-This documentation refers to Getopt::Alt::Command version 0.1.3.
+This documentation refers to Getopt::Alt::Command version 0.1.4.
 
 
 =head1 SYNOPSIS
