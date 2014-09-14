@@ -11,7 +11,7 @@ use version;
 use Carp;
 use English qw/ -no_match_vars /;
 
-our $VERSION = version->new('0.1.4');
+our $VERSION = version->new('0.1.5');
 
 has cmd => (
     is       => 'ro',
@@ -52,11 +52,11 @@ __END__
 
 =head1 NAME
 
-Getopt::Alt::Command - <One-line description of module's purpose>
+Getopt::Alt::Command - Base for sub commands
 
 =head1 VERSION
 
-This documentation refers to Getopt::Alt::Command version 0.1.4.
+This documentation refers to Getopt::Alt::Command version 0.1.5.
 
 
 =head1 SYNOPSIS
