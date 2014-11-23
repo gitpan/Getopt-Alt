@@ -21,7 +21,7 @@ Moose::Exporter->setup_import_methods(
 );
 
 
-our $VERSION = version->new('0.1.5');
+our $VERSION = version->new('0.2.0');
 
 Moose::Util::meta_attribute_alias('Getopt::Alt::Option');
 
@@ -73,7 +73,7 @@ has value => (
     predicate => 'has_value',
 );
 
-my $r_name     = qr/ [^|\s=+!-][^|\s=+!?]* /xms;
+my $r_name     = qr/ [^|\s=+!?@%-][^|\s=+!?@%]* /xms;
 my $r_alt_name = qr/ $r_name | \\d /xms;
 my $r_names    = qr/ $r_name (?: [|] $r_alt_name)* /xms;
 my $r_type     = qr/ [nifsd] /xms;
@@ -96,7 +96,9 @@ sub build_option {
             : ref $params[0] eq 'HASH'  ? %{ $params[0] }
             :                             confess "Can't supply a " . (ref $params[0]) . " ref to new!";
     }
-    if (@params == 1 && !ref $params[0]) {
+
+    # construct attribute params string if one element
+    if (@params == 1) {
         my $spec = pop @params;
         push @params, (opt => $spec);
 
@@ -104,67 +106,57 @@ sub build_option {
 
         my ($names, $options, $null) = $spec =~ /$r_spec/;
         my @names = split /\|/, $names;
-        if ( !@names || grep {!defined $_ || length $_ == 0 || !/$r_name/} @names ) {
-            confess "Invalid option spec '$spec'\n" . Dumper \@names;
-        }
         push @params, 'names', \@names;
         push @params, 'name', $names[0];
 
-        if ( $null && $null eq '?' ) {
+        if ($null) {
             push @params, 'nullable' => 1;
         }
 
         if ($options) {
             my ($type, $extra);
-            if ( my ($option) = $options =~ /^ ( [=+!] ) /xms) {
-                if ($option eq '=') {
-                    ($type, $extra) = split /;/, $options;
-                }
-                else {
-                    ($extra) = $options =~ /^;(.*)/xms;
-                    if ($option eq '+') {
-                        push @params, 'increment' => 1;
-                    }
-                    elsif ($option eq '!') {
-                        push @params, 'negatable' => 1;
-                    }
-                }
+            my ($option) = substr $options, 0, 1;
+
+            if ($option eq '=') {
+                ($type, $extra) = split /;/, $options;
+            }
+            elsif ($option eq '+') {
+                push @params, 'increment' => 1;
+            }
+            else {
+                # $option == !
+                push @params, 'negatable' => 1;
             }
 
             if ($type) {
                 my ($text, $ref);
                 $type =~ s/^=//;
-                die "Unknown type in option spec '$spec' ($type)\n" if $type !~ /^ $r_type $r_ref? $/xms;
+
                 if ( length $type == 1 ) {
-                    ($text) = $type =~ /^ ([nifsd]) $/xms;
-                    croak "Bad spec $spec, Unknown type $type" if !$text;
+                    ($text) = $type =~ /^ ($r_type) $/xms;
                 }
-                elsif ( length $type == 2 ) {
+                else {
                     ($text, $ref) = $type =~ /^ ($r_type) ($r_ref) $/xms;
-                    push @params,
-                         ref =>
-                               $ref eq '%' ? 'HashRef'
-                             : $ref eq '@' ? 'ArrayRef'
-                             :               confess "Unknown reference type '$ref' in '$spec'";
+                    push @params, ref => $ref eq '%' ? 'HashRef' : 'ArrayRef';
                 }
+
                 push @params,
                     type =>
-                          $text eq 's' ? 'Str'
-                        : $text eq 'd' ? 'Int'
+                          $text eq 'd' ? 'Int'
                         : $text eq 'i' ? 'Int'
                         : $text eq 'f' ? 'Num'
                         : $text eq 'n' ? 'Num'
-                        :                confess "Unknown type spec '$type' in '$spec'";
+                        :                'Str';
             }
         }
     }
+
     my %params = @params;
     $params{traits} = ['Getopt::Alt::Option'];
 
     my $type
         = $params{type} && $params{ref} ? "$params{ref}\[$params{type}\]"
         : $params{type}                 ? $params{type}
-        : $params{ref}                  ? $params{ref}
         :                                 'Str';
 
     if ( $params{nullable} ) {
@@ -260,7 +252,7 @@ Getopt::Alt::Option - Sets up a particular command line option
 
 =head1 VERSION
 
-This documentation refers to Getopt::Alt::Option version 0.1.5.
+This documentation refers to Getopt::Alt::Option version 0.2.0.
 
 =head1 SYNOPSIS
 

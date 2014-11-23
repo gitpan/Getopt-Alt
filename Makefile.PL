@@ -14,7 +14,7 @@ WriteMakefile
                    'Path::Class' => 0,
                    'Scalar::Util' => 0,
                    'Test::More' => 0,
-                   'Test::NoWarnings' => 0,
+                   'Test::Warnings' => 0,
                    'Tie::Handle::Scalar' => 0,
                    'Try::Tiny' => 0,
                    'parent' => 0,
