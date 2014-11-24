@@ -17,6 +17,7 @@ use Getopt::Alt::Exception;
 use Try::Tiny;
 use Path::Class;
 use Config::Any;
+use File::HomeDir;
 
 use overload (
     '@{}'  => \&get_files,
@@ -27,7 +28,7 @@ Moose::Exporter->setup_import_methods(
     as_is => [qw/get_options/],
 );
 
-our $VERSION = version->new('0.2.0');
+our $VERSION = version->new('0.2.1');
 our $EXIT    = 1;
 
 has options => (
@@ -149,7 +150,7 @@ sub BUILD {
 
     my $basename = $self->name;
     my $conf = Config::Any->load_stems({
-        stems   => [ ".$basename", "$ENV{HOME}/.$basename", "/etc/.$basename" ],
+        stems   => [ ".$basename", File::HomeDir->my_home . "/.$basename", "/etc/.$basename" ],
         use_ext => 1,
     });
     $conf = {
@@ -432,7 +433,7 @@ Getopt::Alt - Alternate method of processing command line arguments
 
 =head1 VERSION
 
-This documentation refers to Getopt::Alt version 0.2.0.
+This documentation refers to Getopt::Alt version 0.2.1.
 
 =head1 SYNOPSIS
 

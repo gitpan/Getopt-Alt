@@ -7,6 +7,7 @@ WriteMakefile
   'VERSION_FROM' => 'lib/Getopt/Alt.pm',
   'PREREQ_PM' => {
                    'Config::Any' => 0,
+                   'File::HomeDir' => 0,
                    'List::MoreUtils' => 0,
                    'List::Util' => 0,
                    'Moose' => 0,
