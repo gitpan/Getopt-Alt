@@ -28,7 +28,7 @@ Moose::Exporter->setup_import_methods(
     as_is => [qw/get_options/],
 );
 
-our $VERSION = version->new('0.2.1');
+our $VERSION = version->new('0.2.2');
 our $EXIT    = 1;
 
 has options => (
@@ -90,6 +90,12 @@ has sub_command => (
                    'where the generated options will be a sub object of ' .
                    'generated options object. Finally if this is a sub ' .
                    'ref it will be called with self and the rest of ARGV',
+);
+has aliases => (
+    is            => 'rw',
+    isa           => 'HashRef[ArrayRef]',
+    default       => sub {{}},
+    documentation => 'Stores the list of aliases sub-commands can have',
 );
 has default_sub_command => (
     is        => 'rw',
@@ -159,8 +165,14 @@ sub BUILD {
         @{ $conf || [] }
     };
 
-    # perlcritic is confused here combining hashes is not the same as comma seperated arguments
+    # perlcritic is confused here combining hashes is not the same as comma separated arguments
     $self->default({ %{$self->default}, %$conf, });  ## no critic
+
+    if ($conf->{aliases}) {
+        for my $alias (keys %{ $conf->{aliases} }) {
+            $self->aliases->{$alias} = [ split /\s+/, $conf->{aliases}{$alias} ];
+        }
+    }
 
     return;
 }
@@ -250,6 +262,12 @@ sub process {
                 $action = 'next';
             }
             elsif ( $_ eq "last\n" ) {
+                # last means we have found a sub command we should see if it is an alias
+                if ($self->aliases->{$arg}) {
+                    $self->files->[-1] = shift @{ $self->aliases->{$arg} };
+                    unshift @args, @{ $self->aliases->{$arg} };
+                }
+
                 $action = 'last';
             }
             else {
@@ -433,7 +451,7 @@ Getopt::Alt - Alternate method of processing command line arguments
 
 =head1 VERSION
 
-This documentation refers to Getopt::Alt version 0.2.1.
+This documentation refers to Getopt::Alt version 0.2.2.
 
 =head1 SYNOPSIS
 
@@ -637,7 +655,8 @@ be added the end of your
 
 =item C<help> -
 
-???
+The Perl package with the POD documentation for --help and --man, by default
+it's the callers package.
 
 =item C<cmds> - ArrayRef[Getopt::Alt::Command]
 
@@ -658,6 +677,12 @@ method..
 
 The default values for each option. The default value is not modified by
 processing, so if set the same default will be used from call to call.
+
+=item C<aliases> - HashRef[ArrayRef[Str]]
+
+When using sub-commands this allows you to configure aliases for those
+commands, aliases are recursed, they can have extra arguments though.
+If a configuration file is used aliases can be specified in that file.
 
 =back
 
@@ -685,6 +710,32 @@ Returns a list of all command line options in the current object.
 =head1 DIAGNOSTICS
 
 =head1 CONFIGURATION AND ENVIRONMENT
+
+Configuration files can be used to specify default values and aliases. They
+can be located in the current directory, $HOME or /etc.The file name is
+specified by the C<name> attribute (which defaults to the program's name)
+and is prepended with a dot. eg:
+
+For a program called as C<$ ./foo> or C<$ foo> C<name> would be set to foo
+and possible configuration names would be
+
+=over 4
+
+=item *
+
+.foo.yml
+
+=item *
+
+~/.foo.rc
+
+=item *
+
+/etc/.foo.yml
+
+=back
+
+See L<Config::Any> for information about config formats and file extensions.
 
 =head1 DEPENDENCIES
 
