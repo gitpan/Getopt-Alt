@@ -28,7 +28,7 @@ Moose::Exporter->setup_import_methods(
     as_is => [qw/get_options/],
 );
 
-our $VERSION = version->new('0.2.2');
+our $VERSION = version->new('0.2.3');
 our $EXIT    = 1;
 
 has options => (
@@ -112,6 +112,11 @@ has name => (
     isa     => 'Str',
     default => sub { file($0)->basename },
 );
+has conf_prefix => (
+    is      => 'rw',
+    isa     => 'Str',
+    default => '.',
+);
 
 my $count = 1;
 around BUILDARGS => sub {
@@ -155,8 +160,9 @@ sub BUILD {
     my ($self) = @_;
 
     my $basename = $self->name;
+    my $prefix   = $self->conf_prefix;
     my $conf = Config::Any->load_stems({
-        stems   => [ ".$basename", File::HomeDir->my_home . "/.$basename", "/etc/.$basename" ],
+        stems   => [ "$prefix$basename", File::HomeDir->my_home . "/$prefix$basename", "/etc/$basename" ],
         use_ext => 1,
     });
     $conf = {
@@ -451,7 +457,7 @@ Getopt::Alt - Alternate method of processing command line arguments
 
 =head1 VERSION
 
-This documentation refers to Getopt::Alt version 0.2.2.
+This documentation refers to Getopt::Alt version 0.2.3.
 
 =head1 SYNOPSIS
 
