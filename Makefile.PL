@@ -12,7 +12,7 @@ WriteMakefile
                    'List::Util' => 0,
                    'Moose' => 0,
                    'Moose::Role' => 0,
-                   'Path::Class' => 0,
+                   'Path::Tiny' => 0,
                    'Scalar::Util' => 0,
                    'Test::More' => 0,
                    'Test::Warnings' => 0,

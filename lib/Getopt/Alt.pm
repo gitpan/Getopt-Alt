@@ -15,7 +15,7 @@ use List::MoreUtils qw/uniq/;
 use Getopt::Alt::Option qw/build_option/;
 use Getopt::Alt::Exception;
 use Try::Tiny;
-use Path::Class;
+use Path::Tiny;
 use Config::Any;
 use File::HomeDir;
 
@@ -28,7 +28,7 @@ Moose::Exporter->setup_import_methods(
     as_is => [qw/get_options/],
 );
 
-our $VERSION = version->new('0.2.3');
+our $VERSION = version->new('0.2.4');
 our $EXIT    = 1;
 
 has options => (
@@ -44,7 +44,7 @@ has opt => (
 has default => (
     is      => 'rw',
     isa     => 'HashRef',
-    default => sub { {} },
+    default => sub {{}},
 );
 has files => (
     is      => 'rw',
@@ -61,7 +61,7 @@ has ignore_case => (
     isa     => 'Bool',
     default => 1,
 );
-has help => (
+has help_package => (
     is      => 'rw',
     isa     => 'Str',
 );
@@ -83,13 +83,13 @@ has sub_command => (
     is            => 'rw',
     #isa           => 'Bool | HashRef[ArrayRef] | CodeRef',
     predicate     => 'has_sub_command',
-    documentation => 'if true (== 1) processing of args stops at first non ' .
-                   'defined parameter, if a HASH ref the keys are assumed ' .
-                   'to be the allowed sub commands and the values are ' .
-                   'assumed to be parameters to passed to get_options ' .
-                   'where the generated options will be a sub object of ' .
-                   'generated options object. Finally if this is a sub ' .
-                   'ref it will be called with self and the rest of ARGV',
+    documentation => <<'DOC',
+if true (== 1) processing of args stops at first non-defined parameter, if
+a HASH ref the keys are assumed to be the allowed sub commands and the values
+are assumed to be parameters to passed to get_options where the generated
+options will be a sub object of generated options object. Finally if this
+is a sub ref it will be called with self and the rest of ARGV
+DOC
 );
 has aliases => (
     is            => 'rw',
@@ -110,7 +110,7 @@ has auto_complete => (
 has name => (
     is      => 'rw',
     isa     => 'Str',
-    default => sub { file($0)->basename },
+    default => sub { path($0)->basename },
 );
 has conf_prefix => (
     is      => 'rw',
@@ -143,7 +143,6 @@ around BUILDARGS => sub {
         my $object = Moose::Meta::Class->create(
             $class_name,
             superclasses => [ $param{options} || 'Getopt::Alt::Dynamic' ],
-            #methods      => \%method,
         );
 
         while ( my $option = shift @params ) {
@@ -196,7 +195,7 @@ sub get_options {  ## no critic
     try {
         $self = __PACKAGE__->new(@args);
 
-        $self->help($caller) if !$self->help || $self->help eq __PACKAGE__;
+        $self->help_package($caller) if !$self->help_package || $self->help_package eq __PACKAGE__;
 
         $self->process();
     }
@@ -208,7 +207,7 @@ sub get_options {  ## no critic
         warn $_;
         $self = __PACKAGE__->new();
 
-        $self->help($caller) if !$self->help || $self->help eq __PACKAGE__;
+        $self->help_package($caller) if !$self->help_package || $self->help_package eq __PACKAGE__;
 
         $self->_show_help(1);
     };
@@ -301,7 +300,7 @@ sub process {
         if (!$sub) {
             warn "Unknown command '$self->cmd'!\n";
             die Getopt::Alt::Exception->new( message => "Unknown command '$self->cmd'" )
-                if !$self->help;
+                if !$self->help_package;
             $self->_show_help(1);
         }
 
@@ -326,7 +325,7 @@ sub process {
         }
     }
 
-    if ( $self->help ) {
+    if ( $self->help_package ) {
         if ( $self->opt->{VERSION} ) {
              my ($name)  = $PROGRAM_NAME =~ m{^.*/(.*?)$}mxs;
              my $version = defined $main::VERSION ? $main::VERSION : 'undef';
@@ -399,7 +398,7 @@ sub best_option {
 
     return $self->best_option($long, $short, 1) if !$no;
 
-    if ( $self->help ) {
+    if ( $self->help_package ) {
         die [ Getopt::Alt::Exception->new(
                 message => "Unknown option '" . ($long ? "--$long" : "-$short") . "'\n",
                 option  => ($long ? "--$long" : "-$short"),
@@ -424,8 +423,8 @@ sub _show_help {
     my ($self, $verbosity, $msg) = @_;
 
     my %input;
-    if ( $self->help && $self->help ne 1 ) {
-        my $help = $self->help;
+    if ( $self->help_package && $self->help_package ne 1 ) {
+        my $help = $self->help_package;
         if ( !-f $help ) {
             $help  .= '.pm';
             $help =~ s{::}{/}g;
@@ -457,7 +456,7 @@ Getopt::Alt - Alternate method of processing command line arguments
 
 =head1 VERSION
 
-This documentation refers to Getopt::Alt version 0.2.3.
+This documentation refers to Getopt::Alt version 0.2.4.
 
 =head1 SYNOPSIS
 
@@ -659,7 +658,7 @@ Turns ignoring of the case of arguments, off by default.
 If set to a true value this will cause the help, man, and VERSION options to
 be added the end of your
 
-=item C<help> -
+=item C<help_package> -
 
 The Perl package with the POD documentation for --help and --man, by default
 it's the callers package.
